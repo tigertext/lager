@@ -32,6 +32,7 @@
 -export([sup_get/2]).
 -export([proc_lib_format/2]).
 
+-include("tigertext.hrl").
 
 %% from error_logger_file_h
 string_p([]) ->
@@ -204,8 +205,9 @@ lib_format_exception(I, Class, Reason, StackTrace, StackFun, FormatFun)
 
 analyze_exception(error, Term, Stack) ->
     case {is_stacktrace(Stack), Stack, Term} of
-        {true, [{_M,_F,As}=MFA|MFAs], function_clause} when is_list(As) -> 
-            {Term,[MFA],MFAs};
+        {true, [{M,F,As}=MFA|MFAs], function_clause} when is_list(As) ->
+            As1 = sanitize_message(As),
+            {Term,[{M, F, As1}],MFAs};
         {true, [{shell,F,A}], function_clause} when is_integer(A) ->
             {Term, [{F,A}], []};
         {true, [{_M,_F,_AorAs}=MFA|MFAs], undef} ->
@@ -222,6 +224,15 @@ analyze_exception(_Class, Term, Stack) ->
         false ->
             {{Term,Stack},[],[]}
     end.
+
+sanitize_message(As) ->
+    sanitize_message(As, []).
+
+sanitize_message([], Acc) -> Acc;
+sanitize_message([#message{} = A | Rest], Acc) ->
+    sanitize_message(Rest, [A#message{body = "***"} | Acc]);
+sanitize_message([A | Rest], Acc) ->
+    sanitize_message(Rest, [A | Acc]).
 
 is_stacktrace([]) ->
     true;
